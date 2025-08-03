@@ -70,6 +70,68 @@ class ORBSLAM2AUTOTUNE_baseline(BaselineVSLAMLab):
         self.orbslam2_download_vocabulary() 
         self.download_vslamlab_settings()
         return super().execute(command, exp_it, exp_folder, timeout_seconds)
+class ORBSLAM2AUTOTUNE_baseline_test(ORBSLAM2AUTOTUNE_baseline):
+    def __init__(self):
+        super().__init__(baseline_name = 'orbslam2autotune-test', baseline_folder = 'ORB_SLAM2_AUTOTUNE-TEST')
+        self.settings_yaml = os.path.join(self.baseline_path, f'vslamlab_orbslam2autotune-dev_settings.yaml')
+        self.color = 'green'
+
+    def is_cloned(self):
+        return os.path.isdir(os.path.join(self.baseline_path, '.git'))
+ 
+    def is_installed(self):
+        return os.path.isfile(os.path.join(self.baseline_path, 'bin', 'vslamlab_orbslam2_mono'))
+    
+    def info_print(self):
+        super().info_print()
+        print(f"Default executable: Baselines/ORB_SLAM2_AUTOTUNE/bin/vslamlab_orbslam2_mono")
+    
+    def execute(self, command, exp_it, exp_folder, timeout_seconds=1 * 60 * 20):
+        self.orbslam2_download_vocabulary()
+        # self.download_vslamlab_settings()
+        return super().execute(command, exp_it, exp_folder, timeout_seconds)
+    
+class ORBSLAM2AUTOTUNE_baseline_other(ORBSLAM2AUTOTUNE_baseline):
+    def __init__(self):
+        super().__init__(baseline_name = 'orbslam2autotune-other', baseline_folder = 'ORB_SLAM2_AUTOTUNE-OTHER')
+        self.settings_yaml = os.path.join(self.baseline_path, f'vslamlab_orbslam2autotune-dev_settings.yaml')
+        self.color = 'green'
+
+    def is_cloned(self):
+        return os.path.isdir(os.path.join(self.baseline_path, '.git'))
+ 
+    def is_installed(self):
+        return os.path.isfile(os.path.join(self.baseline_path, 'bin', 'vslamlab_orbslam2_mono'))
+    
+    def info_print(self):
+        super().info_print()
+        print(f"Default executable: Baselines/ORB_SLAM2_AUTOTUNE/bin/vslamlab_orbslam2_mono")
+    
+    def execute(self, command, exp_it, exp_folder, timeout_seconds=1 * 60 * 20):
+        self.orbslam2_download_vocabulary()
+        # self.download_vslamlab_settings()
+        return super().execute(command, exp_it, exp_folder, timeout_seconds)
+    
+class ORBSLAM2AUTOTUNE_baseline_tunedisabled(ORBSLAM2AUTOTUNE_baseline):
+    def __init__(self):
+        super().__init__(baseline_name = 'orbslam2autotune-tunedisabled', baseline_folder = 'ORB_SLAM2_AUTOTUNE-TUNEDISABLED')
+        self.settings_yaml = os.path.join(self.baseline_path, f'vslamlab_orbslam2autotune-dev_settings.yaml')
+        self.color = 'green'
+
+    def is_cloned(self):
+        return os.path.isdir(os.path.join(self.baseline_path, '.git'))
+ 
+    def is_installed(self):
+        return os.path.isfile(os.path.join(self.baseline_path, 'bin', 'vslamlab_orbslam2_mono'))
+    
+    def info_print(self):
+        super().info_print()
+        print(f"Default executable: Baselines/ORB_SLAM2_AUTOTUNE/bin/vslamlab_orbslam2_mono")
+    
+    def execute(self, command, exp_it, exp_folder, timeout_seconds=1 * 60 * 20):
+        self.orbslam2_download_vocabulary()
+        # self.download_vslamlab_settings()
+        return super().execute(command, exp_it, exp_folder, timeout_seconds)
 
 class ORBSLAM2AUTOTUNE_baseline_dev(ORBSLAM2AUTOTUNE_baseline):
     def __init__(self):

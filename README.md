@@ -176,6 +176,12 @@ def get_baseline(baseline_name):
 
     return switcher.get(baseline_name, lambda: "Invalid case")()
 ```
+## Using Old Baselines Commits
+Go to the Baselines/your-target-baseline and manualy change the commit by:
+```
+git log #copy the commit hash you want to checkout to
+git checkout <commit hash>
+```
 
 ## License
 **VSLAM-LAB** is released under a **LICENSE.txt**. For a list of code dependencies which are not property of the authors of **VSLAM-LAB**, please check **docs/Dependencies.md**.

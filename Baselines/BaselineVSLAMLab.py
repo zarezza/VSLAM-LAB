@@ -10,7 +10,7 @@ from huggingface_hub import hf_hub_download
 from pynvml import nvmlInit, nvmlShutdown, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
 
 from utilities import ws, print_msg
-from path_constants import VSLAMLAB_BASELINES, TRAJECTORY_FILE_NAME
+from path_constants import VSLAMLAB_BASELINES, TRAJECTORY_FILE_NAME, VSLAM_LAB_DIR
 
 
 SCRIPT_LABEL = f"\033[95m[{os.path.basename(__file__)}]\033[0m "
@@ -198,6 +198,11 @@ class BaselineVSLAMLab:
         exp_folder = os.path.join(exp.folder, dataset.dataset_folder, sequence_name)
         calibration_yaml = os.path.join(sequence_path, 'calibration.yaml')
         rgb_exp_txt = os.path.join(exp_folder, 'rgb_exp.txt')
+
+        for parameter_name, parameter_value in exp.parameters.items():
+            if parameter_name == "settings_yaml": 
+                self.settings_yaml = os.path.join(VSLAM_LAB_DIR, 'configs', parameter_value)
+                break
 
         vslamlab_command = [f"sequence_path:{sequence_path}",
                             f"calibration_yaml:{calibration_yaml}",

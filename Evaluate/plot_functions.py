@@ -40,6 +40,7 @@ from Datasets.get_dataset import get_dataset
 import matplotlib.ticker as ticker
 from matplotlib.transforms import ScaledTranslation
 from matplotlib.colors import to_hex
+from matplotlib.ticker import FuncFormatter
 
 random.seed(6)
 colors_all = mcolors.CSS4_COLORS
@@ -194,9 +195,14 @@ def plot_trajectories(dataset_sequences, exp_names,
 def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, experiments, shared_scale = False):
 
     def set_format(tick):
-        if tick == 0:
-            return f"0"
-        return f"{tick:.1e}"
+        if abs(tick) < 1e-4:
+            return "0"
+        elif abs(tick) < 0.01:
+            return f"{tick:.1e}"
+        elif abs(tick) < 1:
+            return f"{tick:.3f}"
+        else:
+            return f"{tick:.2f}"
 
     # Get number of sequences
     num_sequences = 0
@@ -218,17 +224,12 @@ def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, exp
     NUM_ROWS = math.ceil(num_sequences / NUM_COLS)
     XSIZE, YSIZE = 12, 2 * NUM_ROWS + 0.5
     WIDTH_PER_SERIES = min(XSIZE / len(exp_names), 0.4)
-    FONT_SIZE = 15
+    FONT_SIZE = 12
     fig, axs = plt.subplots(NUM_ROWS, NUM_COLS, figsize=(XSIZE, YSIZE))
     axs = axs.flatten()
 
     # Create legend handles
-    legend_handles = []
-    colors = {}
-    for i_exp, exp_name in enumerate(exp_names):
-        baseline = get_baseline(experiments[exp_name].module)   
-        colors[exp_name] = baseline.color
-        legend_handles.append(Patch(color=colors[exp_name], label=exp_names[i_exp]))
+    legend_handles = [Patch(color=colors[i], label=exp_names[i]) for i in range(len(exp_names))]
         
     # Plot boxplots
     whisker_min = {}
@@ -240,8 +241,8 @@ def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, exp
             values_seq_exp = values[splt['dataset_name']][sequence_name][exp_name]
             if values_seq_exp.empty:
                 continue
-            boxprops = medianprops = whiskerprops = capprops = dict(color=colors[exp_name])
-            flierprops = dict(marker='o', color=colors[exp_name], alpha=1.0)
+            boxprops = medianprops = whiskerprops = capprops = dict(color=colors[i_exp])
+            flierprops = dict(marker='o', color=colors[i_exp], alpha=1.0)
             positions = [i_exp * WIDTH_PER_SERIES]   
             boxplot_accuracy = axs[splt['id']].boxplot(
                 values_seq_exp[metric_name],
@@ -249,7 +250,8 @@ def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, exp
                 patch_artist=False,
                 boxprops=boxprops, medianprops=medianprops,
                 whiskerprops=whiskerprops,
-                capprops=capprops, flierprops=flierprops)
+                capprops=capprops, flierprops=flierprops,
+                showmeans=True, meanline=True)
             whisker_values = [line.get_ydata()[1] for line in boxplot_accuracy['whiskers']]
             whisker_min_seq = min(whisker_min_seq, min(whisker_values))
             whisker_max_seq = max(whisker_max_seq, max(whisker_values))
@@ -286,32 +288,51 @@ def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, exp
 
         whisker_max_seq = whisker_max[sequence_name]
         whisker_min_seq = whisker_min[sequence_name]
-       
-        yticks = [whisker_min_seq, whisker_max_seq]
+        
+        # Calculate 4 evenly spaced ticks including min and max
+        num_ticks = 5  # Including min and max
+        yticks = np.linspace(whisker_min_seq, whisker_max_seq, num_ticks)
+        yrange = whisker_max_seq - whisker_min_seq
 
         axs[splt['id']].grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
         axs[splt['id']].set_xticklabels([])
-        axs[splt['id']].set_ylim(yticks)
-        axs[splt['id']].tick_params(axis='y', labelsize=FONT_SIZE) 
-        axs[splt['id']].yaxis.set_minor_locator(ticker.MultipleLocator((whisker_max_seq - whisker_min_seq) / 4))
+        axs[splt['id']].set_ylim([whisker_min_seq, whisker_max_seq])
+        axs[splt['id']].tick_params(axis='y', labelsize=8, pad=5) 
+        
+        # Set minor locator based on range
+        minor_locator = ticker.AutoMinorLocator(2)
+        axs[splt['id']].yaxis.set_minor_locator(minor_locator)
+        
         if not shared_scale:    
             axs[splt['id']].set_yticks(yticks)
             tick_labels = axs[splt['id']].get_yticklabels()
+            
+            # Format all tick labels
+            for i, label in enumerate(tick_labels):
+                label.set_text(set_format(yticks[i]))
+                # Adjust vertical alignment based on position
+                if i == 0:  # Bottom tick
+                    label.set_verticalalignment('top')
+                elif i == len(tick_labels)-1:  # Top tick
+                    label.set_verticalalignment('bottom')
+                else:  # Middle ticks
+                    label.set_verticalalignment('center')
+            
+            # Color extreme values if they match global min/max
             if whisker_max_seq == max_value:
-                tick_labels[1].set_color("#CD3232")  
+                tick_labels[-1].set_color("#CD3232")  
             if whisker_min_seq == min_value:
                 tick_labels[0].set_color("#32CD32")      
-            tick_labels[0].set_transform(tick_labels[0].get_transform() + ScaledTranslation(0.9, -0.15, fig.dpi_scale_trans))
-            tick_labels[1].set_transform(tick_labels[1].get_transform() + ScaledTranslation(0.9, +0.15, fig.dpi_scale_trans))
-            axs[splt['id']].set_yticklabels([set_format(tick) for tick in yticks])
-
+            
+            axs[splt['id']].set_yticklabels([label.get_text() for label in tick_labels])
         else:
             if splt['id'] == 0:
                 axs[splt['id']].set_yticks(yticks)
                 axs[splt['id']].tick_params(axis="y", rotation=90)
                 axs[splt['id']].set_yticklabels([set_format(tick) for tick in yticks])
             else:
-                axs[splt['id']].set_yticks([])   
+                axs[splt['id']].set_yticks(yticks)
+                axs[splt['id']].set_yticklabels([]) 
 
         
     plt.tight_layout()
@@ -327,7 +348,10 @@ def boxplot_exp_seq(values, dataset_sequences, metric_name, comparison_path, exp
         else:
             axs[splt['id']].set_title(splt['nickname'], fontsize=FONT_SIZE, fontweight='bold', pad=30)
 
-    fig.legend(handles=legend_handles, loc='lower center', ncol=len(legend_handles), fontsize=FONT_SIZE)
+    fig.legend(handles=legend_handles, 
+               loc='lower center', 
+               ncol=math.ceil(len(legend_handles) / 2), 
+               fontsize=FONT_SIZE)
 
     if shared_scale:
         plt.tight_layout(rect=[0, 0.15, 1, 0.95])
@@ -365,10 +389,7 @@ def radar_seq(values, dataset_sequences, exp_names, dataset_nicknames, metric_na
     """
 
     # Create legend handles
-    legend_handles = []
-    for i_exp, exp_name in enumerate(exp_names):
-        baseline = get_baseline(experiments[exp_name].module)
-        legend_handles.append(Patch(color=baseline.color, label=exp_names[i_exp]), )
+    legend_handles = [Patch(color=colors[i], label=exp_names[i]) for i in range(len(exp_names))]
 
     fig, ax = plt.subplots(figsize=(8, 6), subplot_kw=dict(polar=True))
     all_sequence_names = []
@@ -401,7 +422,7 @@ def radar_seq(values, dataset_sequences, exp_names, dataset_nicknames, metric_na
     num_vars = len(all_sequence_names)
     iExp = 0
     y = {}
-    for experiment_name in exp_names:
+    for i_exp, experiment_name in enumerate(exp_names):
         baseline = get_baseline(experiments[experiment_name].module)
         y[experiment_name] = []
         for dataset_name, sequence_names in dataset_sequences.items():
@@ -418,10 +439,10 @@ def radar_seq(values, dataset_sequences, exp_names, dataset_nicknames, metric_na
         values_ += values_[:1]
         angles += angles[:1]
 
-        ax.plot(angles, values_, color=baseline.color, marker='o', linewidth=6)
+        ax.plot(angles, values_, color=colors[i_exp], linewidth=3, alpha=0.7)
         ax.plot(np.linspace(0, 2 * np.pi, 100), [2.75] * 100, linestyle="dashed", color="red", linewidth=1)
         ax.plot(np.linspace(0, 2 * np.pi, 100), [1.0] * 100, linestyle="dashed", color="lime", linewidth=1)
-        #ax.plot(np.linspace(0, 2 * np.pi, 100), [2.72] * 100, linestyle="dashed", color="green", linewidth=2)
+        # ax.plot(np.linspace(0, 2 * np.pi, 100), [2.72] * 100, linestyle="dashed", color="green", linewidth=2)
         ax.set_ylim(0, 3)
         plt.xticks(angles[:-1], all_sequence_names)
         #ax.set_xticklabels(all_sequence_names, fontsize=26)
@@ -431,123 +452,110 @@ def radar_seq(values, dataset_sequences, exp_names, dataset_nicknames, metric_na
         #new_yticks = current_yticks[:-1]  # Exclude the last tick
         #ax.set_yticks(new_yticks)
         #ax.set_yticklabels([str(tick) for tick in new_yticks], fontsize=12)
-        ax.set_yticklabels(['', '', '', '',  '', ''], fontsize=24)   
-        ax.tick_params(labelsize=30) 
-        ax.set_xticklabels(all_sequence_names, fontsize=30, fontweight="bold")
+        # ax.set_yticklabels(['', '', '', '',  '', ''], fontsize=12)   
+        ax.tick_params(labelsize=12) 
+        ax.set_xticklabels(all_sequence_names, fontsize=12, fontweight="bold")
         iExp = iExp + 1
 
     
     plt.tight_layout()
     plot_name = os.path.join(comparison_path, f"{metric_name}_radar.pdf")
-    plt.savefig(plot_name, format='pdf')
     plt.subplots_adjust(top=0.95, bottom=0.15)  # Adjust the top and bottom to make space for the legend
-    fig.legend(handles=legend_handles, loc='lower center', ncol=len(legend_handles))
+    fig.legend(handles=legend_handles, 
+               loc='lower center', 
+               ncol=math.ceil(len(legend_handles) / 2), 
+               fontsize=12)
     plt.show(block=False)
+    plt.savefig(plot_name, format='pdf')
 
 
 def plot_cum_error(values, dataset_sequences, exp_names, dataset_nicknames, metric_name, comparison_path, experiments):
     """
-     ------------ Description:
     This function generates and saves cumulative error plots for different datasets, sequences, and experiments.
     It creates subplots for each sequence within a dataset and plots the cumulative error for each experiment.
     The cumulative error is calculated as the number of values smaller than or equal to each data point.
-
-    ------------ Parameters:
-    values : dict
-        values[dataset_name][sequence_name][exp_name] = pandas.DataFrame()
-    dataset_sequences : dict
-        dataset_sequences[dataset_name] = list{sequence_names}
-    exp_names : list
-        exp_names = list{exp_names}
-    dataset_nicknames : dict
-        dataset_nicknames[dataset_name] = list{sequence_nicknames}
-    metric_name : string
-        metric_name = "accuracy"
     """
-    num_sequences = 0
-    for dataset_name, sequence_names in dataset_sequences.items():
-        num_sequences += len(sequence_names)
-
+    num_sequences = sum(len(sequence_names) for sequence_names in dataset_sequences.values())
     num_cols = 5
     num_rows = math.ceil(num_sequences / num_cols)
-    x_size = 12
-    y_size = num_rows * 2
-
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=(x_size, y_size))
+    fig, axs = plt.subplots(num_rows, num_cols, figsize=(15, num_rows * 3))
     axs = axs.flatten()
 
     # Create legend handles
-    legend_handles = []
-    for i_exp, exp_name in enumerate(exp_names):
-        legend_handles.append(Patch(color=colors[i_exp], label=exp_names[i_exp]), )
+    legend_handles = [Patch(color=colors[i], label=exp_names[i]) for i in range(len(exp_names))]
 
     j_seq = 0
     for dataset_name, sequence_names in dataset_sequences.items():
         for i_seq, sequence_name in enumerate(sequence_names):
             min_x = float('inf')
             max_x = float('-inf')
+            ax = axs[j_seq]
+
             for i_exp, experiment_name in enumerate(exp_names):
-                baseline = get_baseline(experiments[experiment_name].module)
                 data = values[dataset_name][sequence_name][experiment_name]['rmse'].tolist()
+                if not data:  # Skip if no data
+                    continue
+                    
                 sorted_data = sorted(data)
                 cumulated_vector = []
                 for data_i in sorted_data:
                     count_smaller = bisect_left(sorted_data, 1.00001*data_i)
                     cumulated_vector.append(count_smaller)
                 
-                axs[j_seq].plot(sorted_data, cumulated_vector, marker='o', linestyle='-', color=baseline.color)
-                min_x = min(min_x, min(sorted_data))
-                max_x = max(max_x, max(sorted_data))
+                ax.plot(sorted_data, cumulated_vector, 
+                        marker='o', linestyle='-', 
+                        color=colors[i_exp], 
+                        linewidth=1.2, 
+                        markersize=4, 
+                        label=experiment_name)
+                
+                if sorted_data:  # Only update if there's data
+                    min_x = min(min_x, min(sorted_data))
+                    max_x = max(max_x, max(sorted_data))
 
-            y_max = experiments[exp_name].num_runs
-            y_ticks = [0, y_max]
-
-            width_x = 0.1*(max_x - min_x)
-            min_x = 0# max(min_x - width_x,0)
-            max_x = max_x + width_x
-            x_ticks = [min_x, max_x]
-
-            axs[j_seq].set_xticks(x_ticks)
-            if j_seq == 0:
-                axs[j_seq].set_yticks(y_ticks)
-            else:
-                axs[j_seq].set_yticklabels([])
+            max_y = experiments[exp_names[0]].num_runs if exp_names else 0
             
-            # Add minor ticks for the grid (every 10% of the axis range)
-            axs[j_seq].xaxis.set_minor_locator(ticker.MultipleLocator(max_x / 4))
-            axs[j_seq].yaxis.set_minor_locator(ticker.MultipleLocator(y_max / 4))
-
-            axs[j_seq].grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-            axs[j_seq].spines['top'].set_visible(False)   # Remove top border
-            axs[j_seq].spines['right'].set_visible(False) # Remove right border
-            axs[j_seq].tick_params(axis='both', which='minor', labelbottom=False, labelleft=False)
-            axs[j_seq].tick_params(axis='y', labelsize=20, rotation=90) 
-            axs[j_seq].tick_params(axis='x', labelsize=20, rotation=0)            
-            axs[j_seq].set_xlim(x_ticks)
-            axs[j_seq].set_ylim(y_ticks)
-
-            axs[j_seq].tick_params(axis='x', pad=10) 
-            axs[j_seq].set_xticklabels([f"{x_ticks[0]:.2f}", f"{x_ticks[1]:.2f}"], ha='right')  
-
-            def set_format(tick):
-                if tick == 0:
-                    return f"0"
-                return f"{tick:.1e}"
+            # Set axis limits with some padding
+            ax.set_xlim(0, max_x*1.1)  # Start from 0 for better visualization
+            ax.set_ylim(0, max_y*1.05)
             
-            axs[j_seq].set_xticklabels([set_format(tick) for tick in x_ticks])
-            j_seq = j_seq + 1
+            # Improved tick formatting
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+            # ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+            ax.xaxis.set_minor_locator(ticker.AutoMinorLocator(4))
+            ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+            
+            # Format tick labels
+            ax.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
+            ax.tick_params(axis='x', labelsize=10, rotation=45)  # Rotate x labels for better readability
+            ax.tick_params(axis='y', labelsize=10)
+            
+            # Grid and spines
+            ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.6)
+            ax.spines[['top', 'right']].set_visible(False)
+            
+            # Title with sequence nickname
+            ax.set_title(dataset_nicknames[dataset_name][i_seq], 
+                        fontsize=12, 
+                        fontweight='bold',
+                        pad=10)  # Add padding to prevent overlap
+            
+            j_seq += 1
+            
+    # Turn off unused subplots
+    for k in range(j_seq, len(axs)):
+        axs[k].axis('off')
 
+    # Add legend
+    plt.tight_layout(rect=[0, 0.15, 1, 0.95])
+    fig.legend(handles=legend_handles, 
+               loc='lower center', 
+               ncol=math.ceil(len(legend_handles) / 2), 
+               fontsize=12)
+    
+    # Save plot
     plot_name = os.path.join(comparison_path, f"{metric_name}_cummulated_error.pdf")
-    plt.tight_layout()
-    plt.savefig(plot_name, format='pdf')
-
-    j_seq = 0
-    for dataset_name, sequence_names in dataset_sequences.items():
-        for i_seq, sequence_name in enumerate(sequence_names):
-            axs[j_seq].set_title(dataset_nicknames[dataset_name][i_seq])
-
-    fig.legend(handles=legend_handles, loc='lower center', ncol=len(legend_handles))
-    plt.subplots_adjust(top=0.9, bottom=0.25)  # Adjust the top and bottom to make space for the legend
+    plt.savefig(plot_name, format='pdf', bbox_inches='tight')
     plt.show(block=False)
 
 def create_and_show_canvas(dataset_sequences, VSLAMLAB_BENCHMARK, comparison_path, padding=10):
